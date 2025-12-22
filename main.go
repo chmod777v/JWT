@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -13,6 +15,11 @@ type Claims struct {
 	jwt.RegisteredClaims
 	Username string `json:"username"`
 	Admin    bool   `json:"admin"`
+}
+type User struct {
+	Username string
+	Admin    bool
+	Token    string
 }
 
 func NewToken(username string, admin bool, durations time.Duration) (string, error) {
@@ -52,8 +59,42 @@ func ParseValidateToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
+func getToken(w http.ResponseWriter, r *http.Request) {
+	var user User
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println("Erro while receiving data", "ERROR", err.Error())
+		return
+	}
+	token, err := NewToken(user.Username, user.Admin, time.Minute)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println(token)
+	w.Write([]byte(token))
+}
+
+func postToken(w http.ResponseWriter, r *http.Request) {
+	var user User
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println("Erro while receiving data", "ERROR", err.Error())
+		return
+	}
+	fmt.Println(user.Token)
+	claims, err := ParseValidateToken(user.Token)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println(claims.Username, claims.Admin)
+	w.Write([]byte(fmt.Sprintln(claims.Username, claims.Admin)))
+
+}
+
 func main() {
-	token, err := NewToken("ivan", true, time.Second)
+	token, err := NewToken("ivan", true, time.Minute)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -64,6 +105,13 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	}
-
 	fmt.Println(claims.Username, claims.Admin)
+
+	http.HandleFunc("/get-token", getToken)
+	http.HandleFunc("/post-token", postToken)
+	fmt.Println("START")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		fmt.Println("Error starting server", "ERROR", err.Error())
+		return
+	}
 }
