@@ -76,15 +76,21 @@ func getToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func postToken(w http.ResponseWriter, r *http.Request) {
-	var user User
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println("Erro while receiving data", "ERROR", err.Error())
-		return
+	token := r.Header.Get("Authorization")
+
+	if token == "" {
+		var user User
+		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Println("Erro while receiving data", "ERROR", err.Error())
+			return
+		}
+		token = user.Token
 	}
-	fmt.Println(user.Token)
-	claims, err := ParseValidateToken(user.Token)
+
+	claims, err := ParseValidateToken(token)
 	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Println(err.Error())
 		return
 	}
@@ -94,7 +100,7 @@ func postToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	token, err := NewToken("ivan", true, time.Minute)
+	token, err := NewToken("Timur", true, time.Minute)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
